@@ -1,203 +1,220 @@
+#! /usr/bin/env python
+
 import socket
 import sys
 import time
 import random
 
-# # Create a UDP socket
-# sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-# server_port = int(sys.argv[1])
-# print server_port
-# client_port = int(sys.argv[2])
-# # Bind the socket to the port
-# #sever address listens for guess and sends response back
-
-# #server_address = ('localhost', 4000)
-# server_address = ('localhost', server_port)
-# print server_address
-# client_address = ('localhost', client_port)
-# #print >>sys.stderr, 'starting up on %s port %s' % server_address
-# #sock.bind(server_address)
-
-# #listen
-
-# #client server sends guess and listens for respnse
 
 
+DIGITS = 6
+PINS = 4
 
-
-# def eval_guess(client_guess):
-#     if int(client_guess) <= 20:
-#         resp = 'GUESS LOW'
-#     else:
-#         resp = "CORRECT"
-#     return resp
+RAND = False
 
 def server_listen(server_address):
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind(server_address)
-    print >>sys.stderr, '\nSERVER LISTENING'
     loop = 0
     while loop != 1:
-        print >>sys.stderr, '\nwaiting to receive guess'
+        print >>sys.stderr, '\nwaiting to receive guess...'
         client_guess, address = sock.recvfrom(4096)
         print >>sys.stderr, '\nclient guessed "%s"' % client_guess
-        #resp = eval_guess(client_guess)
         guesses = 0
-        res = moo(client_guess, guesses)
-        guesses = str(res[1])
-        bulls = str(res[2])
-        cows = str(res[3])
-        mess = res[4]
-        print >>sys.stderr, ' The guess had %s Bulls\n  %s Cows' % (bulls, cows)
-        resp = ' The guess had %s Bulls\n  %s Cows %s' % (bulls, cows, mess)
+        y = ''.join([str(i) for i in client_guess])
+        z = tuple([int(i) for i in y])
+        res = moo(answer, z)
+        bulls = str(res[1][0])
+        cows = str(res[1][1])
+        print >>sys.stderr, ' The guess had %s Bulls and %s Cows, sending opponent the resutl!\n' % (
+            bulls, cows)
+        resp = '%s %s' % (bulls, cows)
         sent = sock.sendto(resp, address)
-        print >>sys.stderr, '\nsent response to clients'
-        #time.sleep(1)
         loop += 1
         sock.close()
     return res
 
-def  client_guess(my_guess):
+
+def client_guess(guess):
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     my_guess_resp = None
-    time.sleep(1)
+    time.sleep(0.1)
     try:
-        # Send data
-        time.sleep(1)
-        print >>sys.stderr, 'sending my guess "%s"' % my_guess
-        sent = sock.sendto(my_guess, client_address)
-
-        # Receive response
-        print >>sys.stderr, 'waiting to receive response for my guess'
-        #while my_guess_resp != "CORRECT":
+        time.sleep(0.1)
+        guess_2send = ''.join([str(i) for i in guess])
+        sent = sock.sendto(guess_2send, client_address)
+        print >>sys.stderr, 'waiting to receive response for my guess "%s"...' % guess_2send
         my_guess_resp, server = sock.recvfrom(4096)
-        print >>sys.stderr, 'received response "%s"' % my_guess_resp
-    #modify guess and close
+        bulls = my_guess_resp[0]
+        cows = my_guess_resp[2]
+        print >>sys.stderr, 'my guess had %s bulls and %s cows ' % (bulls, cows)
     finally:
-        #if my_guess_resp != "CORRECT":
-         #   n = int(my_guess) +1
-          #  my_guess = str(n)
-       # print >>sys.stderr, 'new guess will be "%s" \nclosing socket' % my_guess
-        time.sleep(1)
+        time.sleep(0.1)
     sock.close()
-    return my_guess, my_guess_resp
+    client_resp = guess, my_guess_resp
+    bulls = int(client_resp[1][0])
+    cows = int(client_resp[1][2])
+    guess = tuple([int(i) for i in client_resp[0]])
+    return (guess, (bulls, cows))
 
-###moo program##
-def moo(guess, guesses):
-        guesses += 1
-        while True:
-            # get a good guess
-            #guess = raw_input('\nNext guess [%i]: ' % guesses).strip()
-            if len(guess) == size and \
-               all(char in digits for char in guess) \
-               and len(set(guess)) == size:
+
+def moo(answer, guess):
+    bulls = cows = 0
+    for i in range(size):
+        if guess[i] == answer[i]:
+            bulls += 1
+        elif guess[i] in answer:
+            cows += 1
+    res = (guess, (bulls, cows))
+    return res
+import argparse
+import random
+import sys
+
+
+def allPatterns():
+    """Generator function to yield all possible color combinations"""
+    cur = [0] * PINS
+    while True:
+        yield tuple(cur)
+        for i in range(PINS):
+            cur[i] += 1
+            if cur[i] < DIGITS:
                 break
-            mess = "Problem, try again. You need to enter %i unique digits from 1 to 9" % size
-            res = [0,0,0,0,mess]
-            return res
-        if guess == chosen:
-            mess = '\n Congratulations you guessed correctly in %s attempts' % str(guesses)
+            cur[i] = 0
+            if i == PINS - 1:
+                return
+
+
+def check(answer, probe):
+    """Given an answer and a guess, return a score of (red, white)"""
+    acolcnt = [0] * DIGITS
+    pcolcnt = [0] * DIGITS
+
+    red = 0
+    for (a, p) in zip(answer, probe):
+        if a == p:
+            red = red + 1
         else:
-            mess = "\n"
-        bulls = cows = 0
-        for i in range(size):
-            if guess[i] == chosen[i]:
-                bulls += 1
-            elif guess[i] in chosen:
-                cows += 1
-            else:
-                break
-        print >>sys.stderr, '  %i Bulls\n  %i Cows' % (bulls, cows)
-        res = [guess, guesses, bulls, cows, mess]
-        return res
+            acolcnt[a] += 1
+            pcolcnt[p] += 1
+    white = 0
+    for a, p in zip(acolcnt, pcolcnt):
+        white += min(a, p)
+    return (red, white)
 
-# Create a UDP socket
-#sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-server_port = int(sys.argv[1])
-print server_port
-client_port = int(sys.argv[2])
-# Bind the socket to the port
-#sever address listens for guess and sends response back
 
-#server_address = ('localhost', 4000)
+def unique(seq, keepstr=True):
+    t = type(seq)
+    if t in (str, unicode):
+        t = (list, ''.join)[bool(keepstr)]
+    seen = []
+    return t(c for c in seq if not (c in seen or seen.append(c)))
+
+
+def possibleAnswers(prevRounds):
+    pr = tuple(prevRounds)
+    ans = (candidate for candidate in allPatterns() if all(
+        (check(candidate, probe) == result for (probe, result) in pr)))
+    return (candidate for candidate in ans if len(unique(candidate)) == 4)
+
+
+def randomPattern():
+    return tuple((random.randint(0, DIGITS - 1) for i in range(PINS)))
+
+
+def chooseFirst(answers):
+    guess = answers.next()
+    answersCount = lambda: len(list(answers)) + 1
+    return (guess, answersCount)
+
+
+def chooseBest(answers):
+    allAnswers = list(answers)
+    bestGuess = None
+    bestScore = pow(DIGITS, PINS)
+    bestResults = {}
+    for guess in allAnswers:
+        results = {}
+        for possibleAnswer in allAnswers:
+            possibleResult = check(possibleAnswer, guess)
+            results[possibleResult] = 1 + results.get(possibleResult, 0)
+        score = max(results.values())
+        if score < bestScore:
+            bestGuess = guess
+            bestScore = score
+            bestResults = results
+    return (bestGuess, lambda: len(allAnswers))
+
+
+def chooseRandom(answers):
+    allAnswers = list(answers)
+    guess = random.choice(allAnswers)
+    return (guess, lambda: len(allAnswers))
+
+
+server_port = int(sys.argv[2])
+client_port = int(sys.argv[3])
 server_address = ('localhost', server_port)
-
-
 client_address = ('localhost', client_port)
-print >>sys.stderr, 'server is "%s"' % str(server_address)
-print >>sys.stderr, 'client is "%s"' % str(client_address)
-
 my_guess = str(0)
 client_resp = None
 resp = None
-
 my_guess_resp = None
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-
-# while resp != "CORRECT":
-#     if server_port < client_port:
-#         resp = server_listen(server_address)
-#     client_resp = client_guess(my_guess)
-#     my_guess = client_resp[0]
-#     if client_resp[1] != "CORRECT":
-#         resp = server_listen(server_address)
-#     else:
-#         resp = "CORRECT"
-#         print >>sys.stderr, "corect wow"
-guesses = 0
-digits = '123456789'
+digits = range(10)
 size = 4
-#chosen = ''.join(random.sample(digits,size))
-chosen = "1234"
-#
 
-#my_guess = raw_input('\nNext guess [%i]: ' % guesses).strip()
-
-
-# #for port 4000 4001
-# if server_port < client_port:
-#     while resp != "CORRECT":
-#         resp = server_listen(server_address)
-#         time.sleep(2)
-#         client_resp = client_guess(my_guess)
-#         n = int(my_guess) +1
-#         my_guess = str(n)
-#     resp = "CORRECT"
-#     print >>sys.stderr, "corect wow"
-
-# if server_port > client_port:
-#     while resp != "CORRECT":
-#         client_resp = client_guess(my_guess)
-#         n = int(my_guess) +1
-#         my_guess = str(n)
-#         resp = server_listen(server_address)
-#     resp = "CORRECT"
-#     print >>sys.stderr, "corect wow"
-
-
-res = [0, 0, 0, 0]
+res = ((0, 0, 0, 0), (0, 0))
 guesses = 0
-#for port 4000 4001
+
 if server_port < client_port:
-    while int(res[2]) != 4:
+    if RAND == True:
+        answer = random.sample(digits, size)
+    else:
+        ans = sys.argv[1]
+        answer = [int(i) for i in ans]
+
+    rounds = []
+    while int(res[1][0]) != 4:
         res = server_listen(server_address)
-        time.sleep(2)
-        my_guess = raw_input('\nNext guess [%i]: ' % guesses).strip()
+        time.sleep(0.1)
+        if res[1][0] == 4:
+            break
+        print >>sys.stderr, "computing probabilistic guess..."
+        answers = possibleAnswers(rounds)
+        (guess, answersCount) = chooseBest(answers)
+        print >>sys.stderr, "done"
+        print >>sys.stderr, 'guessing "%s"' % ''.join([str(i) for i in guess])
         guesses += 1
-        client_resp = client_guess(my_guess)
-    resp = "CORRECT"
-    print >>sys.stderr, "corect wow"
+        client_resp = client_guess(guess)
+        if client_resp[1][0] == 4:
+            guess_2send = ''.join([str(i) for i in guess])
+            print 'My guess "%s" was correct, I win!' % guess_2send
+            break
+    print >>sys.stderr, "opponent guessed corect!!"
 
 if server_port > client_port:
-    while int(res[2]) != 4:
-    #while res[2] != '4': #could use this instead
-        my_guess = raw_input('\nNext guess [%i]: ' % guesses).strip()
+    rounds = []
+    if RAND == True:
+        answer = random.sample(digits, size)
+    else:
+        ans = sys.argv[1]
+        answer = [int(i) for i in ans]
+    while int(res[1][0]) != 4:
+        print >>sys.stderr, "computing probabilistic guess..."
+        answers = possibleAnswers(rounds)
+        (guess, answersCount) = chooseBest(answers)
+        print >>sys.stderr, "done"
+        print >>sys.stderr, 'guessing "%s"' % ''.join([str(i) for i in guess])
         guesses += 1
-        client_resp = client_guess(my_guess)
+        client_resp = client_guess(guess)
+        if client_resp[1][0] == 4:
+            guess_2send = ''.join([str(i) for i in guess])
+            print 'My guess "%s" was correct, I win!' % guess_2send
+            break
+        rounds.append(client_resp)
         res = server_listen(server_address)
-    resp = "CORRECT"
-    print >>sys.stderr, "corect wow"
-
-
-
-
+        if res[1][0] == 4:
+            print >>sys.stderr, "opponent guessed corect!!"
+            break
